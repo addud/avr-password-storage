@@ -15,7 +15,6 @@
 #define PIN_DATA PINB
 #define DATA_PIN 1
 
-
 #define TRUE 1
 #define FALSE 0
 
@@ -29,151 +28,163 @@ static uint8_t *inpt, *outpt;
 void ps2_init(void) {
 	bitcount = 11;
 	toDevice = FALSE;
-	//edge = 0;
-	GICR |= (1 << INT2); //enable INT2 interrupt
-	MCUCSR = (0 << ISC2);   // INT2 interrupt on falling edge
+	//enable INT2 interrupt
+	GICR |= (1 << INT2);
+	// INT2 interrupt on falling edge
+	MCUCSR = (0 << ISC2);
 }
 
-void kb_init(void)
-{
+void kb_init(void) {
 	ps2_init();
 	kb_clear_buff();
 }
 
+// Initialize buffer
 void kb_clear_buff(void) {
-	inpt =  kb_buffer;                        // Initialize buffer
+	inpt = kb_buffer;
 	outpt = kb_buffer;
-	buffcnt=0;
+	buffcnt = 0;
 }
 
-void decode(unsigned char sc)
-{
-    static unsigned char is_up = 0, shift = 0, ext=0;
-    unsigned char i;
+void decode(unsigned char sc) {
+	static unsigned char is_up = 0, shift = 0, ext = 0;
+	unsigned char i;
 
-    if (!is_up)                // previous data received was the up-key identifier
-    {
-        switch (sc)
-        {
-          case 0xF0 :        // The up-key identifier
-            is_up = 1;
-            break;
+	// previous data received was the up-key identifier
+	if (!is_up) {
+		switch (sc) {
+		// The up-key identifier
+		case 0xF0:
+			is_up = 1;
+			break;
 
-		  case 0xE0:		//do a lookup of extended keys
+			//do a lookup of extended keys
+		case 0xE0:
 			ext = 1;
 			break;
 
-          case 0x12 :        // Left SHIFT
-            shift = 1;
-            break;
+			// Left SHIFT
+		case 0x12:
+			shift = 1;
+			break;
 
-          case 0x59 :        // Right SHIFT
-            shift = 1;
-            break;
+			// Right SHIFT
+		case 0x59:
+			shift = 1;
+			break;
 
-          default:
+		default:
+			//extended key lookup
+			if (ext) {
 
-			if(ext) { //extended key lookup
-
-				for(i = 0; (pgm_read_byte(&extended[i][0])!=sc) && pgm_read_byte(&extended[i][0]); i++)
+				for (i = 0;
+						(pgm_read_byte(&extended[i][0]) != sc)
+								&& pgm_read_byte(&extended[i][0]); i++)
 					;
 				if (pgm_read_byte(&extended[i][0]) == sc)
-					//ext_char = pgm_read_byte(&extended[i][1]);
 					put_kbbuff(pgm_read_byte(&extended[i][1]));
-			}
-			else {
+			} else {
 
-				if(!shift)           // If shift not pressed, do a table look-up
-				{
-						for(i = 0; (pgm_read_byte(&unshifted[i][0])!=sc) && pgm_read_byte(&unshifted[i][0]); i++)
-							;
-						if (pgm_read_byte(&unshifted[i][0])== sc)
-							put_kbbuff(pgm_read_byte(&unshifted[i][1]));
+				// If shift not pressed, do a table look-up
+				if (!shift) {
+					for (i = 0;
+							(pgm_read_byte(&unshifted[i][0]) != sc)
+									&& pgm_read_byte(&unshifted[i][0]); i++)
+						;
+					if (pgm_read_byte(&unshifted[i][0]) == sc)
+						put_kbbuff(pgm_read_byte(&unshifted[i][1]));
+
+				} else {
+
+					// If shift pressed
+					for (i = 0;
+							(pgm_read_byte(&shifted[i][0]) != sc)
+									&& pgm_read_byte(&shifted[i][0]); i++)
+						;
+					if (pgm_read_byte(&shifted[i][0]) == sc)
+						put_kbbuff(pgm_read_byte(&shifted[i][1]));
 
 				}
-				else {               // If shift pressed
-
-						for(i = 0; (pgm_read_byte(&shifted[i][0])!=sc) && pgm_read_byte(&shifted[i][0]); i++)
-							;
-						if (pgm_read_byte(&shifted[i][0])== sc)
-							put_kbbuff(pgm_read_byte(&shifted[i][1]));
-
-				}
-
 
 			}
 
-        }
+		}
 
-    }
+	}
+	// is_up = 1
+	else {
+		// Two 0xF0 in a row not allowed
+		is_up = 0;
+		ext = 0;
+		switch (sc) {
 
-	else {			// is_up = 1
+		// Left SHIFT
+		case 0x12:
+			shift = 0;
+			break;
 
-		is_up = 0;  // Two 0xF0 in a row not allowed
-		ext=0;
-        switch (sc)
-        {
-          case 0x12 :                        // Left SHIFT
-            shift = 0;
-            break;
+			// Right SHIFT
+		case 0x59:
+			shift = 0;
+			break;
 
-          case 0x59 :                        // Right SHIFT
-            shift = 0;
-            break;
-
-        }
-    }
-
-}
-
-static void put_kbbuff(unsigned char c)
-{
-    if (buffcnt<BUFF_SIZE)                        // If buffer not full
-    {
-        *inpt = c;                                // Put character into buffer
-        inpt++;                                    // Increment pointer
-
-        buffcnt++;
-
-        if (inpt >= (kb_buffer + BUFF_SIZE))        // Pointer wrapping
-            inpt = kb_buffer;
-    }
-}
-
-
-uint8_t kb_get_char(void)
-{
-    uint8_t byte;
-    while(buffcnt == 0);                        // Wait for data
-
-    byte = *outpt;                                // Get byte
-    outpt++;                                    // Increment pointer
-
-    if ( outpt >= (kb_buffer + BUFF_SIZE) )            // Pointer wrapping
-        outpt = kb_buffer;
-
-    buffcnt--;                                    // Decrement buffer count
-
-    return byte;
+		}
+	}
 
 }
 
+static void put_kbbuff(unsigned char c) {
+	// If buffer not full
+	if (buffcnt < BUFF_SIZE) {
+		// Put character into buffer
+		*inpt = c;
+		// Increment pointer
+		inpt++;
 
+		buffcnt++;
+
+		// Pointer wrapping
+		if (inpt >= (kb_buffer + BUFF_SIZE))
+			inpt = kb_buffer;
+	}
+}
+
+uint8_t kb_get_char(void) {
+	uint8_t byte;
+	// Wait for data
+	while (buffcnt == 0)
+		;
+
+	// Get byte
+	byte = *outpt;
+	// Increment pointer
+	outpt++;
+
+	// Pointer wrapping
+	if (outpt >= (kb_buffer + BUFF_SIZE))
+		outpt = kb_buffer;
+
+	// Decrement buffer count
+	buffcnt--;
+
+	return byte;
+
+}
 
 ISR(INT2_vect) {
 	static uint8_t byteIn;
 
 	sei();
 
+	//If data bit
 	if (bitcount > 2 && bitcount < 11) {
-
 		byteIn = (byteIn >> 1);
 		if (PIN_DATA & (1 << DATA_PIN))
 			byteIn |= 0x80;
 	}
 
+	//If scancode transfer complete
 	if (--bitcount == 0) {
-
 		decode(byteIn);
 		bitcount = 11;
 	}

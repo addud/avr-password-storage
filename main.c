@@ -12,31 +12,34 @@
 #include "storage.h"
 #include "config.h"
 
+//Button pins
 #define MENU			PD6
 #define SELECT			PD5
 #define CYCLE 			PD4
 
+//States for buttons
 #define STATE_PRESSED 		0
 #define STATE_RELEASED 		1
+
+//States for USB message sending
 #define STATE_SEND 			2
 #define STATE_DONE 			3
 
-#define NUM_LOCK 1
-#define CAPS_LOCK 2
-#define SCROLL_LOCK 4
-
+//Modes for the menu
 #define MODE_SEND			0
 #define MODE_ADD			1
 #define MODE_REMOVE			2
 #define MODE_CHANGE			3
 #define MODE_MENU			4
 
+//Number of items in the menu
 #define MENU_LENGTH			4
 
+//Special interest characters for data input
 #define ESC					27
 #define BACKSPACE			8
 
-// The buffer needs to accommodate a password
+// The buffer needs to accommodate a password + null terminator
 #define MSG_BUFFER_SIZE 	(PASSWORD_MAX_LENGTH + 1)
 
 #define MOD_SHIFT_LEFT (1<<1)
@@ -61,17 +64,15 @@ PGM_P menu_items[] PROGMEM =
 };
 
 static char** passwords;
+static uint8_t pass_no;
 
 static keyboard_report_t keyboard_report; // sent to PC
-volatile static uchar LED_state = 0xff; // received from PC
-static uchar idleRate; // repeat rate for keyboards
+static uchar idleRate; // repeat rate for the emulated keyboard
 
 static uchar messageState = STATE_DONE;
 static char stringBuffer[MSG_BUFFER_SIZE] = "";
 static uchar messagePtr = 0;
 static uchar messageCharNext = 1;
-
-static uint8_t pass_no;
 
 static uint8_t mode;
 
@@ -85,13 +86,13 @@ void init(void) {
 
 	kb_init();
 	usbInit();
-	// initialize LCD
 	lcd_init(LCD_DISP_ON);
 	lcd_puts("..");
 	_delay_ms(20);
 
 }
-
+//Handles control messages from the PC
+//(class and vendor requests)
 usbMsgLen_t usbFunctionSetup(uchar data[8]) {
 	usbRequest_t *rq = (void *) data;
 
@@ -117,25 +118,10 @@ usbMsgLen_t usbFunctionSetup(uchar data[8]) {
 	return 0; // by default don't return any data
 }
 
-usbMsgLen_t usbFunctionWrite(uint8_t * data, uchar len) {
-	if (data[0] == LED_state)
-		return 1;
-	else
-		LED_state = data[0];
-
-	// LED state changed
-	if (LED_state & CAPS_LOCK)
-		PORTB |= 1 << PB0; // LED on
-	else
-		PORTB &= ~(1 << PB0); // LED off
-
-	return 1; // Data read, not expecting more
-}
-
 // The buildReport is called by main loop and it starts transmitting
 // characters when messageState == STATE_SEND. The message is stored
 // in messageBuffer and messagePtr tells the next character to send.
-// Remember to reset messagePtr to 0 after populating the buffer!
+// messagePtr needs to be reset each time  after populating messageBuffer
 uchar buildReport() {
 	uchar ch;
 
@@ -154,10 +140,10 @@ uchar buildReport() {
 			keyboard_report.modifier = 0;
 			keyboard_report.keycode[0] = (ch == '0') ? 39 : 30 + (ch - '1');
 		} else if (ch >= 'a' && ch <= 'z') {
-			keyboard_report.modifier = (LED_state & 2) ? MOD_SHIFT_LEFT : 0;
+			keyboard_report.modifier = 0;
 			keyboard_report.keycode[0] = 4 + (ch - 'a');
 		} else if (ch >= 'A' && ch <= 'Z') {
-			keyboard_report.modifier = (LED_state & 2) ? 0 : MOD_SHIFT_LEFT;
+			keyboard_report.modifier = MOD_SHIFT_LEFT;
 			keyboard_report.keycode[0] = 4 + (ch - 'A');
 		} else {
 			keyboard_report.modifier = 0;
@@ -197,57 +183,54 @@ void toggle_led(uint8_t pin) {
 	PORTB ^= _BV(pin);
 }
 
+//Returns th button if pressed, otherwise return UINT8_MAX
+uint8_t check_button(uint8_t pin, uint8_t* state, uint8_t* count) {
+
+	if (bit_is_clear(PIND, pin)) {
+
+		if (*state == STATE_RELEASED) {
+			//Debouncing when the button is released
+			if (*count == DEBOUNCE_PERIOD) {
+				*state = STATE_PRESSED;
+				return pin;
+			} else {
+				(*count)++;
+			}
+		}
+	} else {
+		*state = STATE_RELEASED;
+		*count = 0;
+	}
+	return UINT8_MAX;
+}
+
+//Check all three buttons
 uint8_t poll_buttons() {
 
-	static uint8_t menu_count = 0, select_count = 0, next_count = 0;
+	static uint8_t menu_count = 0, select_count = 0, cycle_count = 0;
 	static uint8_t menu_state = STATE_PRESSED, select_state = STATE_PRESSED,
-			next_state = STATE_PRESSED;
+			cycle_state = STATE_PRESSED;
+	uint8_t button = UINT8_MAX;
 
-	if (bit_is_clear(PIND, MENU)) {
-		if (menu_state == STATE_RELEASED) {
-			if (menu_count == DEBOUNCE_PERIOD) {
-				menu_state = STATE_PRESSED;
-				return MENU;
-			} else {
-				menu_count++;
-			}
-		}
-	} else {
-		menu_state = STATE_RELEASED;
-		menu_count = 0;
+	button = check_button(MENU, &menu_state, &menu_count);
+	if (button != UINT8_MAX) {
+		return button;
 	}
 
-	if (bit_is_clear(PIND, SELECT)) {
-		if (select_state == STATE_RELEASED) {
-			if (select_count == DEBOUNCE_PERIOD) {
-				select_state = STATE_PRESSED;
-				return SELECT;
-			} else {
-				select_count++;
-			}
-		}
-	} else {
-		select_state = STATE_RELEASED;
-		select_count = 0;
+	button = check_button(SELECT, &select_state, &select_count);
+	if (button != UINT8_MAX) {
+		return button;
 	}
 
-	if (bit_is_clear(PIND, CYCLE)) {
-		if (next_state == STATE_RELEASED) {
-			if (next_count == DEBOUNCE_PERIOD) {
-				next_state = STATE_PRESSED;
-				return CYCLE;
-			} else {
-				next_count++;
-			}
-		}
-	} else {
-		next_state = STATE_RELEASED;
-		next_count = 0;
+	button = check_button(CYCLE, &cycle_state, &cycle_count);
+	if (button != UINT8_MAX) {
+		return button;
 	}
 
 	return UINT8_MAX;
 }
 
+//Simulates a backspace delete on the keyboard
 uint8_t lcd_backspace(uint8_t cnt) {
 	if (cnt == 0) {
 		return cnt;
@@ -266,6 +249,9 @@ uint8_t lcd_backspace(uint8_t cnt) {
 	return cnt - 1;
 }
 
+//Starts a data input session
+//Read characters from keyboard
+//Ends with ESC (cancelled) or ENTER (confirmed)
 uint8_t input_password() {
 	uint8_t cnt = 0;
 	uchar c;
@@ -296,7 +282,9 @@ int main() {
 	uint16_t i;
 	uint8_t pass_len;
 
-//	wdt_enable(WDTO_1S); // enable 1s watchdog timer
+	//Since we are waiting indefinitely for input from keyboard,
+	//the watchdog is not applicable anymore
+	//wdt_enable(WDTO_1S); // enable 1s watchdog timer
 
 	init();
 
@@ -305,36 +293,30 @@ int main() {
 
 	usbDeviceDisconnect(); // enforce re-enumeration
 	for (i = 0; i < 250; i++) { // wait 500 ms
-		wdt_reset();
-		// keep the watchdog happy
+		//wdt_reset();
 		_delay_ms(2);
 	}
 	usbDeviceConnect();
 
-	TCCR1B |= (1 << CS01); // timer 0 at clk/8 will generate randomness
-
 	// Enable interrupts after re-enumeration
 	sei();
 
-//	eeprom_write_byte(0,0);
+	//Enable this to reinitialize passwords/EEPROM
+	//eeprom_write_byte(0,0);
 
 	pass_no = read_passwords(&passwords);
+
 	index = 0;
 	mode = MODE_MENU;
 	menulen = MENU_LENGTH;
 
-//	while (c = KbGetChar()) {
-//		if (c == '\r') {
-//			break;
-//		}
-//		lcd_putc(c);
-//	}
-
 	while (1) {
-		wdt_reset();
+		//wdt_reset();
 		// keep the watchdog happy
 		usbPoll();
 
+		//Only display stuff if a button was pressed
+		//(most likely something changed on the screen)
 		if (button_pressed != UINT8_MAX) {
 			lcd_clrscr();
 			if (mode == MODE_MENU) {
@@ -350,7 +332,7 @@ int main() {
 
 		switch (button_pressed) {
 		case MENU:
-
+			//Get back to the main menu
 			mode = MODE_MENU;
 			index = 0;
 			menulen = MENU_LENGTH;
@@ -359,6 +341,7 @@ int main() {
 			break;
 
 		case CYCLE:
+			//Prepare next item for display
 			if (index < menulen - 1) {
 				lcd_clrscr();
 				index++;
@@ -370,6 +353,7 @@ int main() {
 
 		case SELECT:
 			if (mode == MODE_MENU) {
+				//We can add password directly from the MENU mode (main menu)
 				if (index == MODE_ADD) {
 
 					uint8_t pass_len;
@@ -387,10 +371,12 @@ int main() {
 						menulen = pass_no;
 						write_passwords(pass_no, passwords);
 					}
-					mode=MODE_MENU;
-					menulen=MENU_LENGTH;
+					//Get back to the MENU mode (main menu)
+					mode = MODE_MENU;
+					menulen = MENU_LENGTH;
 					toggle_led(PB0);
 				} else {
+					//Enter the corresponding mode
 					mode = index;
 					index = 0;
 					menulen = pass_no;
@@ -400,21 +386,25 @@ int main() {
 				if (index < menulen) {
 					switch (mode) {
 					case MODE_SEND:
+						//Send password to the PC
 						strcpy(stringBuffer, passwords[index]);
 						messagePtr = 0;
 						messageState = STATE_SEND;
+						//Stay in the SEND mode displaying the same password
 						break;
 
 					case MODE_REMOVE:
+						//Remove password
 						free(passwords[index]);
 						for (i = index; i < pass_no - 1; i++) {
 							passwords[i] = passwords[i + 1];
 						}
 						pass_no--;
 						passwords = realloc(passwords, pass_no * sizeof(char*));
+						write_passwords(pass_no, passwords);
+						//Stay in the REMOVE mode, but display the first password
 						index = 0;
 						menulen = pass_no;
-						write_passwords(pass_no, passwords);
 						break;
 
 					case MODE_CHANGE:
@@ -428,9 +418,8 @@ int main() {
 							strcpy(passwords[index], stringBuffer);
 							write_passwords(pass_no, passwords);
 						}
-//						mode = MODE_MENU;
+						//Stay in the CHANGE mode, but display the first password
 						index = 0;
-//						menulen = MENU_LENGTH;
 						toggle_led(PB0);
 						break;
 					}
@@ -439,10 +428,8 @@ int main() {
 			}
 			break;
 		}
-		// characters are sent when messageState == STATE_SEND and after receiving
-		// the initial LED state from PC (good way to wait until device is recognized)
-		if (usbInterruptIsReady() && messageState == STATE_SEND
-				&& LED_state != 0xff) {
+		// characters are sent when messageState == STATE_SEND
+		if (usbInterruptIsReady() && messageState == STATE_SEND) {
 			messageState = buildReport();
 			usbSetInterrupt((void *) &keyboard_report, sizeof(keyboard_report));
 		}

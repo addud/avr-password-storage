@@ -1,10 +1,3 @@
-/*
- * storage.h
- *
- *  Created on: 22 May 2013
- *      Author: addu
- */
-
 #ifndef STORAGE_H_
 #define STORAGE_H_
 
