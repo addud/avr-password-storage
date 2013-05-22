@@ -9,7 +9,7 @@ uint16_t eeprom_write_string(char* s, uint8_t* addr) {
 	uint16_t cnt = 0;
 	do {
 		eeprom_busy_wait();
-		eeprom_write_byte(addr++, *s);
+		eeprom_update_byte(addr++, *s);
 		cnt++;
 	} while (*s++ != '\0');
 	return cnt;
@@ -64,15 +64,15 @@ void write_passwords(uint8_t len, char** sarray) {
 	uint16_t i;
 
 	eeprom_busy_wait();
-	eeprom_write_byte((uint8_t*) (addr++), EEPROM_HASH);
+	eeprom_update_byte((uint8_t*) (addr++), EEPROM_HASH);
 
 	eeprom_busy_wait();
-	eeprom_write_byte((uint8_t*) (addr++), len);
+	eeprom_update_byte((uint8_t*) (addr++), len);
 
 	for (i = 0; i < len; i++) {
 		uint8_t nr = eeprom_write_string(sarray[i], (uint8_t*) (addr + 1));
 		eeprom_busy_wait();
-		eeprom_write_byte((uint8_t*) addr, nr);
+		eeprom_update_byte((uint8_t*) addr, nr);
 		addr += 1 + nr;
 	}
 }
