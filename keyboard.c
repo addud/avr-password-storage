@@ -103,7 +103,7 @@ void decode(unsigned char sc)
 
 			}
 
-        } //switch(sc)
+        }
 
     }
 

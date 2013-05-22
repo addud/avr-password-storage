@@ -2,7 +2,6 @@
 #define SCANCODES_H
 
 #include <avr/pgmspace.h>
-#include "ext_keys.h"
 
 /* some scan codes */
 #define F1	0x05

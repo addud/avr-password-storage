@@ -387,6 +387,8 @@ int main() {
 						menulen = pass_no;
 						write_passwords(pass_no, passwords);
 					}
+					mode=MODE_MENU;
+					menulen=MENU_LENGTH;
 					toggle_led(PB0);
 				} else {
 					mode = index;

@@ -1,6 +1,9 @@
+#include <stdlib.h>
 #include <avr/eeprom.h>
 #include "config.h"
+#include "keyboard.h"
 #include "storage.h"
+#include "lcd.h"
 
 uint16_t eeprom_write_string(char* s, uint8_t* addr) {
 	uint16_t cnt = 0;
@@ -49,7 +52,7 @@ uint8_t read_passwords(char*** passwords) {
 
 		(*passwords)[i] = malloc(nr * sizeof(char));
 		nr = eeprom_read_string((*passwords)[i], (uint8_t*) addr);
-		lcd_puts((*passwords)[i]);
+//		lcd_puts((*passwords)[i]);
 		addr += nr;
 	}
 
