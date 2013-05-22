@@ -8,14 +8,8 @@
 #include "usbdrv/usbdrv.h"
 #include "lcd.h"
 #include "hid_descriptor.h"
-#include "ps2_kb.h"
-
-#define F_CPU 12000000L
-
-#define EEPROM_START_ADDRESS	0
-#define EEPROM_HASH				0xAA
-
-#define DEBOUNCE_PERIOD		200
+#include "keyboard.h"
+#include "config.h"
 
 #define MENU			PD6
 #define SELECT			PD5
@@ -42,7 +36,7 @@
 #define BACKSPACE			8
 
 // The buffer needs to accommodate a password
-#define MSG_BUFFER_SIZE 16
+#define MSG_BUFFER_SIZE 	(PASSWORD_MAX_LENGTH + 1)
 
 #define MOD_SHIFT_LEFT (1<<1)
 
@@ -56,14 +50,12 @@ char string_1[] PROGMEM = "SEND PASS";
 char string_2[] PROGMEM = "ADD PASS";
 char string_3[] PROGMEM = "REMOVE PASS";
 char string_4[] PROGMEM = "CHANGE PASS";
-//char string_5[] PROGMEM = "MENU";
 PGM_P menu_items[] PROGMEM =
 {
 	string_1,
 	string_2,
 	string_3,
 	string_4,
-//    string_5
 };
 
 static char** passwords;
@@ -225,7 +217,7 @@ uint8_t read_passwords() {
 	uint8_t hash;
 
 	eeprom_busy_wait();
-	hash=eeprom_read_byte((uint8_t*) (addr++));
+	hash = eeprom_read_byte((uint8_t*) (addr++));
 
 	if (hash != EEPROM_HASH) {
 		lcd_clrscr();
@@ -508,7 +500,7 @@ int main() {
 							write_passwords(pass_no, passwords);
 						}
 //						mode = MODE_MENU;
-						index=0;
+						index = 0;
 //						menulen = MENU_LENGTH;
 						toggle_led(PB0);
 						break;

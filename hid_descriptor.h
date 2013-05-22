@@ -1,10 +1,3 @@
-/*
- * hid_descriptor.h
- *
- *  Created on: May 18, 2013
- *      Author: root
- */
-
 #ifndef HID_DESCRIPTOR_H_
 #define HID_DESCRIPTOR_H_
 

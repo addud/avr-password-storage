@@ -17,6 +17,21 @@
 #define F11	0x78
 #define F12	0x07
 
+//extended keys
+#define HOME 0xF0
+#define END 0xF1
+#define DEL 0xF1
+#define INS 0xF3
+#define PGDN 0xF4
+#define PGUP 0xF5
+#define U_ARROW 0xF6
+#define D_ARROW 0xF7
+#define L_ARROW 0xF8
+#define R_ARROW 0xF9
+#define DIV 0xFA
+#define CTRL 0xFB
+#define ALT 0xFC
+
 //Unshifted characters
 unsigned char unshifted[][2] PROGMEM=
 {

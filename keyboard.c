@@ -2,7 +2,7 @@
 #include <util/delay.h>
 #include <avr/interrupt.h>
 #include "scancodes.h"
-#include "ps2_kb.h"
+#include "keyboard.h"
 
 #define BUFF_SIZE 16
 #define DDR_CLOCK DDRB
