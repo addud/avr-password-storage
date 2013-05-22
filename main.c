@@ -14,7 +14,7 @@
 
 #define MENU			PD6
 #define SELECT			PD5
-#define NEXT 			PD4
+#define CYCLE 			PD4
 
 #define STATE_PRESSED 		0
 #define STATE_RELEASED 		1
@@ -77,7 +77,7 @@ static uint8_t mode;
 
 void init(void) {
 	PORTD |= _BV(SELECT);
-	PORTD |= _BV(NEXT);
+	PORTD |= _BV(CYCLE);
 	PORTD |= _BV(MENU);
 
 	DDRB = 1 << PB0; // PB0 as output
@@ -234,11 +234,11 @@ uint8_t poll_buttons() {
 		select_count = 0;
 	}
 
-	if (button_is_pressed(PIND, NEXT)) {
+	if (button_is_pressed(PIND, CYCLE)) {
 		if (next_state == STATE_RELEASED) {
 			if (next_count == DEBOUNCE_PERIOD) {
 				next_state = STATE_PRESSED;
-				return NEXT;
+				return CYCLE;
 			} else {
 				next_count++;
 			}
@@ -361,7 +361,7 @@ int main() {
 			toggle_led(PB0);
 			break;
 
-		case NEXT:
+		case CYCLE:
 			if (index < menulen - 1) {
 				lcd_clrscr();
 				index++;
