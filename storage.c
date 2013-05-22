@@ -33,8 +33,8 @@ uint8_t read_passwords(char*** passwords) {
 	hash = eeprom_read_byte((uint8_t*) (addr++));
 
 	if (hash != EEPROM_HASH) {
-		lcd_clrscr();
-		lcd_puts("EEPROM corrupt");
+//		lcd_clrscr();
+//		lcd_puts("EEPROM corrupt");
 		return 0;
 	}
 
