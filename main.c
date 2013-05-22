@@ -80,13 +80,14 @@ void init(void) {
 	PORTD |= _BV(CYCLE);
 	PORTD |= _BV(MENU);
 
+	//LED used for debugging
 	DDRB = 1 << PB0; // PB0 as output
 
 	kb_init();
 	usbInit();
 	// initialize LCD
 	lcd_init(LCD_DISP_ON);
-	lcd_puts("select..");
+	lcd_puts("..");
 	_delay_ms(20);
 
 }
@@ -191,13 +192,9 @@ uchar buildReport() {
 	return STATE_SEND;
 }
 
+//LED used for debugging
 void toggle_led(uint8_t pin) {
 	PORTB ^= _BV(pin);
-}
-
-uint8_t button_is_pressed(uint8_t pin, uint8_t button) {
-	return (bit_is_clear(pin, button));
-
 }
 
 uint8_t poll_buttons() {
@@ -206,7 +203,7 @@ uint8_t poll_buttons() {
 	static uint8_t menu_state = STATE_PRESSED, select_state = STATE_PRESSED,
 			next_state = STATE_PRESSED;
 
-	if (button_is_pressed(PIND, MENU)) {
+	if (bit_is_clear(PIND, MENU)) {
 		if (menu_state == STATE_RELEASED) {
 			if (menu_count == DEBOUNCE_PERIOD) {
 				menu_state = STATE_PRESSED;
@@ -220,7 +217,7 @@ uint8_t poll_buttons() {
 		menu_count = 0;
 	}
 
-	if (button_is_pressed(PIND, SELECT)) {
+	if (bit_is_clear(PIND, SELECT)) {
 		if (select_state == STATE_RELEASED) {
 			if (select_count == DEBOUNCE_PERIOD) {
 				select_state = STATE_PRESSED;
@@ -234,7 +231,7 @@ uint8_t poll_buttons() {
 		select_count = 0;
 	}
 
-	if (button_is_pressed(PIND, CYCLE)) {
+	if (bit_is_clear(PIND, CYCLE)) {
 		if (next_state == STATE_RELEASED) {
 			if (next_count == DEBOUNCE_PERIOD) {
 				next_state = STATE_PRESSED;
